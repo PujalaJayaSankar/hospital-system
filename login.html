@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login</title>
+  <style>
+    body { font-family: Arial; background:#f4f6f9; display:flex; justify-content:center; align-items:center; height:100vh; }
+    .box { background:white; padding:30px; border-radius:15px; width:320px; box-shadow:0px 0px 12px rgba(0,0,0,0.2); }
+    h2 { text-align:center; color:#0077ff; }
+    input { width:100%; padding:12px; margin:10px 0; border-radius:10px; border:1px solid #ccc; }
+    button { width:100%; padding:12px; background:#0077ff; color:white; border:none; border-radius:10px; cursor:pointer; }
+    button:hover { background:#005ed1; }
+    .error { color:red; text-align:center; }
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h2>🔐 Admin Login</h2>
+  <input type="text" id="username" placeholder="Username" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+  <p class="error" id="errorMsg"></p>
+</div>
+
+<script>
+  async function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    const res = await fetch("/admin_login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      window.location.href = "/admin";
+    } else {
+      document.getElementById("errorMsg").innerText = data.message;
+    }
+  }
+</script>
+
+</body>
+</html>

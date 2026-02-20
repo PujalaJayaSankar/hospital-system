@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel</title>
+
+  <style>
+    body { font-family: Arial; background:#f4f6f9; padding:20px; }
+    h2 { color:#0077ff; margin:0; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
+    .logout { background:#ff4d4d; color:white; padding:10px 14px; border:none; border-radius:10px; cursor:pointer; }
+    .logout:hover { background:darkred; }
+
+    .search-box { text-align:center; margin: 20px 0; }
+    input { padding:10px; width:320px; border:1px solid #ccc; border-radius:8px; }
+
+    table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0px 0px 10px rgba(0,0,0,0.1); }
+    th, td { padding:12px; border-bottom:1px solid #eee; text-align:center; font-size:14px; }
+    th { background:#0077ff; color:white; }
+
+    button.deleteBtn { padding:7px 12px; border:none; border-radius:8px; cursor:pointer; background:red; color:white; }
+    button.deleteBtn:hover { background:darkred; }
+
+    button.pdfBtn { padding:7px 12px; border:none; border-radius:8px; cursor:pointer; background:green; color:white; }
+    button.pdfBtn:hover { background:darkgreen; }
+
+    .reportBox {
+      background:white;
+      padding:15px;
+      border-radius:12px;
+      box-shadow:0px 0px 10px rgba(0,0,0,0.1);
+      margin-bottom:20px;
+    }
+
+    select {
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      margin-right:10px;
+    }
+
+    .reportBtn {
+      padding:10px 14px;
+      background:#0077ff;
+      color:white;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+    }
+    .reportBtn:hover { background:#005ed1; }
+  </style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <h2>🏥 Admin Panel - Appointments</h2>
+  <button class="logout" onclick="logout()">Logout</button>
+</div>
+
+<div class="reportBox">
+  <h3>📊 Doctor-wise Daily Report</h3>
+
+  <select id="doctorSelect">
+    <option value="Dr. Rajesh">Dr. Rajesh</option>
+    <option value="Dr. Priya">Dr. Priya</option>
+    <option value="Dr. Kumar">Dr. Kumar</option>
+    <option value="Dr. Anjali">Dr. Anjali</option>
+    <option value="Dr. Suresh">Dr. Suresh</option>
+    <option value="Dr. Meena">Dr. Meena</option>
+    <option value="Dr. Ramesh">Dr. Ramesh</option>
+  </select>
+
+  <select id="dateSelect"></select>
+
+  <button class="reportBtn" onclick="generateReport()">Generate Report</button>
+  <p id="reportCount"></p>
+</div>
+
+<div class="search-box">
+  <input type="text" id="searchInput" placeholder="Search..." onkeyup="filterTable()" />
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Phone</th>
+      <th>State</th>
+      <th>City</th>
+      <th>Department</th>
+      <th>Doctor</th>
+      <th>Date</th>
+      <th>Time</th>
+      <th>PDF</th>
+      <th>Delete</th>
+    </tr>
+  </thead>
+  <tbody id="appointmentsTable"></tbody>
+</table>
+
+<script>
+  let allAppointments = [];
+
+  function formatDate(d) {
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  function loadNext7Days() {
+    const dateSelect = document.getElementById("dateSelect");
+    dateSelect.innerHTML = "";
+
+    const today = new Date();
+
+    for (let i = 0; i < 8; i++) {
+      const newDate = new Date(today);
+      newDate.setDate(today.getDate() + i);
+
+      const formatted = formatDate(newDate);
+
+      const option = document.createElement("option");
+      option.value = formatted;
+      option.textContent = formatted;
+      dateSelect.appendChild(option);
+    }
+  }
+
+  async function loadAppointments() {
+    const res = await fetch("/appointments");
+    if (res.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
+
+    allAppointments = await res.json();
+    displayAppointments(allAppointments);
+  }
+
+  function displayAppointments(data) {
+    const table = document.getElementById("appointmentsTable");
+    table.innerHTML = "";
+
+    data.forEach(app => {
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${app.id}</td>
+        <td>${app.name}</td>
+        <td>${app.phone}</td>
+        <td>${app.state}</td>
+        <td>${app.city}</td>
+        <td>${app.department}</td>
+        <td>${app.doctor}</td>
+        <td>${app.date}</td>
+        <td>${app.time}</td>
+        <td><button class="pdfBtn" onclick="openPDF(${app.id})">PDF</button></td>
+        <td><button class="deleteBtn" onclick="deleteAppointment(${app.id})">Delete</button></td>
+      `;
+
+      table.appendChild(row);
+    });
+  }
+
+  function openPDF(id) {
+    window.open(`/pdf/${id}`, "_blank");
+  }
+
+  async function deleteAppointment(id) {
+    if (!confirm("Delete this appointment?")) return;
+    await fetch(`/delete/${id}`, { method: "DELETE" });
+    loadAppointments();
+  }
+
+  function filterTable() {
+    const search = document.getElementById("searchInput").value.toLowerCase();
+
+    const filtered = allAppointments.filter(app =>
+      (app.name || "").toLowerCase().includes(search) ||
+      (app.phone || "").toLowerCase().includes(search) ||
+      (app.state || "").toLowerCase().includes(search) ||
+      (app.city || "").toLowerCase().includes(search) ||
+      (app.department || "").toLowerCase().includes(search) ||
+      (app.doctor || "").toLowerCase().includes(search) ||
+      (app.date || "").toLowerCase().includes(search) ||
+      (app.time || "").toLowerCase().includes(search)
+    );
+
+    displayAppointments(filtered);
+  }
+
+  async function generateReport() {
+    const doctor = document.getElementById("doctorSelect").value;
+    const date = document.getElementById("dateSelect").value;
+
+    const res = await fetch("/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doctor, date })
+    });
+
+    const data = await res.json();
+
+    document.getElementById("reportCount").innerText =
+      `Total Appointments for ${doctor} on ${date}: ${data.length}`;
+
+    displayAppointments(data);
+  }
+
+  function logout() {
+    window.location.href = "/logout";
+  }
+
+  loadNext7Days();
+  loadAppointments();
+</script>
+
+</body>
+</html>

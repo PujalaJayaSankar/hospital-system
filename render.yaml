@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: hospital-appointment-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh

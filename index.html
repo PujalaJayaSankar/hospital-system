@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hospital Appointment Chatbot</title>
+
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f6f9; margin:0; padding:0; }
+
+    .chatbot-container {
+      width: 370px;
+      height: 630px;
+      background: white;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      border-radius: 15px;
+      box-shadow: 0px 0px 15px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background:#0077ff;
+      color:white;
+      padding:15px;
+      font-size:18px;
+      font-weight:bold;
+      text-align:center;
+    }
+
+    .chat-box {
+      flex:1;
+      padding:10px;
+      overflow-y:auto;
+      background:#f9fbff;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .msg {
+      padding:10px;
+      margin:8px 0;
+      border-radius:10px;
+      max-width:85%;
+      font-size:14px;
+      white-space: pre-line;
+    }
+
+    .bot { background:#e3edff; align-self:flex-start; }
+    .user { background:#0077ff; color:white; align-self:flex-end; }
+
+    .chat-input { display:flex; border-top:1px solid #ddd; }
+
+    input {
+      flex:1;
+      padding:12px;
+      border:none;
+      outline:none;
+      font-size:14px;
+    }
+
+    button {
+      padding:12px 15px;
+      border:none;
+      background:#0077ff;
+      color:white;
+      cursor:pointer;
+      font-size:14px;
+    }
+
+    button:hover { background:#005ed1; }
+  </style>
+</head>
+
+<body>
+
+<div class="chatbot-container">
+  <div class="chat-header">🏥 Hospital Appointment Bot</div>
+
+  <div class="chat-box" id="chatBox"></div>
+
+  <div class="chat-input">
+    <input type="text" id="userInput" placeholder="Type here..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script>
+  let step = 0;
+
+  let appointment = {};
+
+  let statesList = [];
+  let citiesList = [];
+  let hospitalsList = [];
+  let doctorsList = [];
+  let freeSlots = [];
+
+  const chatBox = document.getElementById("chatBox");
+  const userInput = document.getElementById("userInput");
+
+  function addMessage(text, sender) {
+    const msg = document.createElement("div");
+    msg.classList.add("msg", sender);
+    msg.innerText = text;
+    chatBox.appendChild(msg);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function botReply(message) {
+    setTimeout(() => addMessage(message, "bot"), 400);
+  }
+
+  function resetBooking() {
+    step = 0;
+    appointment = {};
+    statesList = [];
+    citiesList = [];
+    hospitalsList = [];
+    doctorsList = [];
+    freeSlots = [];
+  }
+
+  botReply("Hello 👋 Welcome!\n\nType 'book' to book an appointment.");
+
+  // ------------------- API CALLS -------------------
+  async function fetchStates() {
+    const res = await fetch("/states");
+    return await res.json();
+  }
+
+  async function fetchCities(state) {
+    const res = await fetch(`/cities/${encodeURIComponent(state)}`);
+    return await res.json();
+  }
+
+  async function fetchHospitals(state, city) {
+    const res = await fetch("/hospitals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state, city })
+    });
+    return await res.json();
+  }
+
+  async function fetchDoctors(department) {
+    const res = await fetch(`/doctors/${encodeURIComponent(department)}`);
+    return await res.json();
+  }
+
+  async function fetchFreeSlots(doctor, date) {
+    const res = await fetch("/available_slots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doctor, date })
+    });
+    return await res.json();
+  }
+
+  async function saveAppointment() {
+    const res = await fetch("/book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(appointment)
+    });
+    return await res.json();
+  }
+
+  // ------------------- CHAT FLOW -------------------
+  async function sendMessage() {
+    const text = userInput.value.trim();
+    if (text === "") return;
+
+    addMessage(text, "user");
+    userInput.value = "";
+
+    // Step 0: start
+    if (step === 0) {
+      if (text.toLowerCase() === "book") {
+        botReply("Great 😄\nWhat is your name?");
+        step = 1;
+      } else {
+        botReply("Please type 'book' to start appointment booking.");
+      }
+    }
+
+    // Step 1: name
+    else if (step === 1) {
+      appointment.name = text;
+      botReply("Enter your phone number 📱 (example: 9876543210)");
+      step = 2;
+    }
+
+    // Step 2: phone
+    else if (step === 2) {
+      appointment.phone = text;
+
+      botReply("Fetching states... ⏳");
+      statesList = await fetchStates();
+
+      let msg = "Select your State (type number):\n\n";
+      statesList.forEach((s, i) => msg += `${i + 1}) ${s}\n`);
+
+      botReply(msg);
+      step = 3;
+    }
+
+    // Step 3: state
+    else if (step === 3) {
+      const idx = parseInt(text) - 1;
+
+      if (isNaN(idx) || idx < 0 || idx >= statesList.length) {
+        botReply("❌ Invalid state selection.\nPlease type state number.");
+        return;
+      }
+
+      appointment.state = statesList[idx];
+
+      botReply("Fetching cities... ⏳");
+      citiesList = await fetchCities(appointment.state);
+
+      if (citiesList.length === 0) {
+        botReply("❌ No cities found.\nType 'book' to restart.");
+        resetBooking();
+        return;
+      }
+
+      let msg = `Select City in ${appointment.state} (type number):\n\n`;
+      citiesList.forEach((c, i) => msg += `${i + 1}) ${c}\n`);
+
+      botReply(msg);
+      step = 4;
+    }
+
+    // Step 4: city
+    else if (step === 4) {
+      const idx = parseInt(text) - 1;
+
+      if (isNaN(idx) || idx < 0 || idx >= citiesList.length) {
+        botReply("❌ Invalid city selection.\nPlease type city number.");
+        return;
+      }
+
+      appointment.city = citiesList[idx];
+
+      botReply("Fetching hospitals... ⏳");
+      hospitalsList = await fetchHospitals(appointment.state, appointment.city);
+
+      if (hospitalsList.length === 0) {
+        botReply("❌ No hospitals found in this city.\nType 'book' to restart.");
+        resetBooking();
+        return;
+      }
+
+      let msg = `🏥 Select Hospital in ${appointment.city} (type number):\n\n`;
+      hospitalsList.forEach((h, i) => msg += `${i + 1}) ${h}\n`);
+
+      botReply(msg);
+      step = 5;
+    }
+
+    // Step 5: hospital
+    else if (step === 5) {
+      const idx = parseInt(text) - 1;
+
+      if (isNaN(idx) || idx < 0 || idx >= hospitalsList.length) {
+        botReply("❌ Invalid hospital selection.\nPlease type hospital number.");
+        return;
+      }
+
+      appointment.hospital = hospitalsList[idx];
+
+      botReply("Which department do you need?\n\n1) ENT\n2) Cardiology\n3) Dental\n4) General");
+      step = 6;
+    }
+
+    // Step 6: department
+    else if (step === 6) {
+      let dept = text;
+
+      if (text === "1") dept = "ENT";
+      else if (text === "2") dept = "Cardiology";
+      else if (text === "3") dept = "Dental";
+      else if (text === "4") dept = "General";
+
+      appointment.department = dept;
+
+      botReply("Fetching doctors... ⏳");
+      doctorsList = await fetchDoctors(dept);
+
+      if (doctorsList.length === 0) {
+        botReply("❌ No doctors found.\nType 'book' to restart.");
+        resetBooking();
+        return;
+      }
+
+      let msg = "Choose doctor (type number):\n\n";
+      doctorsList.forEach((d, i) => msg += `${i + 1}) ${d.name} (${d.timing})\n`);
+
+      botReply(msg);
+      step = 7;
+    }
+
+    // Step 7: doctor
+    else if (step === 7) {
+      const idx = parseInt(text) - 1;
+
+      if (isNaN(idx) || idx < 0 || idx >= doctorsList.length) {
+        botReply("❌ Invalid doctor selection.\nPlease type doctor number.");
+        return;
+      }
+
+      appointment.doctor = doctorsList[idx].name;
+      appointment.doctorTiming = doctorsList[idx].timing;
+
+      botReply("📅 Enter appointment date (example: 20-02-2026)");
+      step = 8;
+    }
+
+    // Step 8: date
+    else if (step === 8) {
+      appointment.date = text;
+
+      botReply("Checking free time slots... ⏳");
+
+      freeSlots = await fetchFreeSlots(appointment.doctor, appointment.date);
+
+      if (freeSlots.length === 0) {
+        botReply("❌ No slots available for this doctor on this date.\nType 'book' to try again.");
+        resetBooking();
+        return;
+      }
+
+      let msg = "⏰ Choose time slot (type number):\n\n";
+      freeSlots.forEach((s, i) => msg += `${i + 1}) ${s}\n`);
+
+      botReply(msg);
+      step = 9;
+    }
+
+    // Step 9: slot + confirm
+    else if (step === 9) {
+      const idx = parseInt(text) - 1;
+
+      if (isNaN(idx) || idx < 0 || idx >= freeSlots.length) {
+        botReply("❌ Invalid slot selection.\nPlease type slot number.");
+        return;
+      }
+
+      appointment.time = freeSlots[idx];
+
+      botReply("Saving your appointment... ⏳");
+
+      const result = await saveAppointment();
+
+      if (result.success) {
+        const apptId = result.appointment_id;
+
+        botReply(
+          "✅ Appointment Confirmed 🎉\n\n" +
+          `🆔 Appointment ID: ${apptId}\n` +
+          `👤 Name: ${appointment.name}\n` +
+          `📱 Phone: ${appointment.phone}\n` +
+          `📍 State: ${appointment.state}\n` +
+          `🏙️ City: ${appointment.city}\n` +
+          `🏥 Hospital: ${appointment.hospital}\n` +
+          `🏥 Dept: ${appointment.department}\n` +
+          `👨‍⚕️ Doctor: ${appointment.doctor}\n` +
+          `🕒 Doctor Timing: ${appointment.doctorTiming}\n` +
+          `📅 Date: ${appointment.date}\n` +
+          `⏰ Time: ${appointment.time}\n\n` +
+          `📄 Download Slip: window.location.origin + '/pdf/${apptId}' \n\n` +
+          "Type 'book' to book another appointment."
+        );
+      } else {
+        botReply(result.message);
+      }
+
+      resetBooking();
+    }
+  }
+
+  // Enter key support
+  userInput.addEventListener("keypress", function(event) {
+    if (event.key === "Enter") sendMessage();
+  });
+</script>
+
+</body>
+</html>
