@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Doctor Dashboard</title>
+
+<style>
+body {
+    font-family: Arial;
+    background:#f4f6f9;
+    margin:0;
+    padding:20px;
+}
+
+.card {
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+    margin-bottom:20px;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td {
+    padding:10px;
+    border-bottom:1px solid #ddd;
+    text-align:left;
+}
+
+th {
+    background:#0077ff;
+    color:white;
+}
+</style>
+
+</head>
+<body>
+
+<h2>👨‍⚕️ Doctor Dashboard</h2>
+
+<div class="card">
+    <h3>My Appointments</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Patient</th>
+                <th>Hospital</th>
+                <th>Date</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody id="appointmentsTable">
+            <tr><td colspan="4">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+async function loadAppointments() {
+
+    const response = await fetch("/doctor_dashboard");
+    const data = await response.json();
+
+    const table = document.getElementById("appointmentsTable");
+    table.innerHTML = "";
+
+    if (data.length === 0) {
+        table.innerHTML = "<tr><td colspan='4'>No appointments yet.</td></tr>";
+        return;
+    }
+
+    data.forEach(row => {
+        table.innerHTML += `
+            <tr>
+                <td>${row[0]}</td>
+                <td>${row[1]}</td>
+                <td>${row[2]}</td>
+                <td>${row[3]}</td>
+            </tr>
+        `;
+    });
+}
+
+loadAppointments();
+</script>
+
+</body>
+</html>

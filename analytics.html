@@ -4,98 +4,124 @@
     <title>Admin Analytics Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial; padding: 30px; background:#f4f6f9; }
-        h2 { color:#333; }
-        .card {
-            background:white;
-            padding:20px;
-            margin-bottom:20px;
-            border-radius:10px;
-            box-shadow:0 2px 5px rgba(0,0,0,0.1);
+        body {
+            font-family: Arial;
+            background: #f4f6f9;
+            margin: 20px;
         }
-        canvas { margin-top:20px; }
+
+        h2 {
+            color: #0077ff;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        canvas {
+            margin-top: 20px;
+        }
     </style>
 </head>
+
 <body>
 
-<h2>Admin Analytics Dashboard</h2>
+<h2>📊 Admin Analytics Dashboard</h2>
 
-<div class="card">
-    <h3>Total Appointments: {{ total }}</h3>
-    <h3>Today's Appointments: {{ today }}</h3>
+<div class="card stats">
+    <div>
+        <h3>Total Appointments</h3>
+        <h1 id="total">0</h1>
+    </div>
+    <div>
+        <h3>Today's Appointments</h3>
+        <h1 id="today">0</h1>
+    </div>
 </div>
 
 <div class="card">
-    <h3>Doctor Wise Appointments</h3>
+    <h3>Doctor Wise</h3>
     <canvas id="doctorChart"></canvas>
 </div>
 
 <div class="card">
-    <h3>Monthly Appointments</h3>
+    <h3>Monthly</h3>
     <canvas id="monthlyChart"></canvas>
 </div>
 
 <div class="card">
-    <h3>Hospital Wise Distribution</h3>
+    <h3>Hospital Wise</h3>
     <canvas id="hospitalChart"></canvas>
 </div>
 
 <script>
+async function loadAnalytics() {
 
-const doctors = JSON.parse('{{ doctors|tojson|safe }}');
-const counts = JSON.parse('{{ counts|tojson|safe }}');
-const months = JSON.parse('{{ months|tojson|safe }}');
-const monthlyCounts = JSON.parse('{{ monthly_counts|tojson|safe }}');
-const hospitals = JSON.parse('{{ hospital_ids|tojson|safe }}');
-const hospitalCounts = JSON.parse('{{ hospital_counts|tojson|safe }}');
-// 🎨 Doctor Bar Chart (Animated)
-new Chart(document.getElementById('doctorChart'), {
-    type: 'bar',
-    data: {
-        labels: doctors,
-        datasets: [{
-            label: 'Appointments',
-            data: counts,
-            backgroundColor: 'rgba(54,162,235,0.7)'
-        }]
-    },
-    options: {
-        animation: { duration: 1500 }
-    }
-});
+    const res = await fetch("/analytics_data");
+    const data = await res.json();
 
-// 📅 Monthly Line Chart (Animated)
-new Chart(document.getElementById('monthlyChart'), {
-    type: 'line',
-    data: {
-        labels: months,
-        datasets: [{
-            label: 'Monthly Appointments',
-            data: monthlyCounts,
-            borderColor: 'green',
-            fill: false
-        }]
-    },
-    options: {
-        animation: { duration: 1500 }
-    }
-});
+    document.getElementById("total").innerText = data.total;
+    document.getElementById("today").innerText = data.today;
 
-// 🏥 Hospital Pie Chart
-new Chart(document.getElementById('hospitalChart'), {
-    type: 'pie',
-    data: {
-        labels: hospitals,
-        datasets: [{
-            data: hospitalCounts,
-            backgroundColor: ['red','blue','green','orange','purple']
-        }]
-    },
-    options: {
-        animation: { duration: 1500 }
-    }
-});
+    // Doctor Chart
+    const doctorNames = data.doctor_data.map(d => d[0]);
+    const doctorCounts = data.doctor_data.map(d => d[1]);
 
+    new Chart(document.getElementById("doctorChart"), {
+        type: "bar",
+        data: {
+            labels: doctorNames,
+            datasets: [{
+                label: "Appointments",
+                data: doctorCounts,
+                backgroundColor: "#36A2EB"
+            }]
+        }
+    });
+
+    // Monthly Chart
+    const months = data.monthly_data.map(m => m[0]);
+    const monthCounts = data.monthly_data.map(m => m[1]);
+
+    new Chart(document.getElementById("monthlyChart"), {
+        type: "line",
+        data: {
+            labels: months,
+            datasets: [{
+                label: "Monthly",
+                data: monthCounts,
+                borderColor: "green",
+                fill: false
+            }]
+        }
+    });
+
+    // Hospital Chart
+    const hospitalNames = data.hospital_data.map(h => h[0]);
+    const hospitalCounts = data.hospital_data.map(h => h[1]);
+
+    new Chart(document.getElementById("hospitalChart"), {
+        type: "pie",
+        data: {
+            labels: hospitalNames,
+            datasets: [{
+                data: hospitalCounts,
+                backgroundColor: ["red","blue","orange","purple","green"]
+            }]
+        }
+    });
+}
+
+loadAnalytics();
 </script>
 
 </body>

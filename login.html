@@ -23,26 +23,37 @@
   <button onclick="login()">Login</button>
   <p class="error" id="errorMsg"></p>
 </div>
-
 <script>
-  async function login() {
+async function login() {
+
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
+    const errorBox = document.getElementById("errorMsg");
 
-    const res = await fetch("/admin_login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
+    errorBox.innerText = "";
+
+    const res = await fetch("/login_user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
 
     if (data.success) {
-      window.location.href = "/admin";
+
+        if (data.role === "admin") {
+            window.location.href = "/admin";
+        }
+
+        else if (data.role === "doctor") {
+            window.location.href = "/doctor";
+        }
+
     } else {
-      document.getElementById("errorMsg").innerText = data.message;
+        errorBox.innerText = data.message || "Invalid username or password";
     }
-  }
+}
 </script>
 
 </body>
