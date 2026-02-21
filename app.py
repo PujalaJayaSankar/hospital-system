@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, session, redirect, send_file
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, send_file,render_template_string
 import sqlite3
 from io import BytesIO
 
@@ -9,6 +9,150 @@ from reportlab.lib import colors
 
 app = Flask(__name__)
 app.secret_key = "hospital_secret_key_123"
+@app.route("/test_session")
+def test_session():
+    return str(session)
+
+@app.route('/analytics')
+def analytics():
+
+    # 🔐 Admin protection
+    if not session.get("admin_logged_in"):
+        return redirect('/login')
+
+    conn = sqlite3.connect("appointments.db")
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM appointments")
+    total = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM appointments WHERE date=date('now')")
+    today = cur.fetchone()[0]
+
+    cur.execute("SELECT doctor, COUNT(*) FROM appointments GROUP BY doctor")
+    doctor_data = cur.fetchall()
+
+    doctors = [row[0] for row in doctor_data]
+    counts = [row[1] for row in doctor_data]
+
+    cur.execute("""
+        SELECT strftime('%m', date), COUNT(*)
+        FROM appointments
+        GROUP BY strftime('%m', date)
+    """)
+    monthly_data = cur.fetchall()
+
+    months = [row[0] for row in monthly_data]
+    monthly_counts = [row[1] for row in monthly_data]
+
+    cur.execute("""
+        SELECT hospital, COUNT(*)
+        FROM appointments
+        GROUP BY hospital
+    """)
+    hospital_data = cur.fetchall()
+
+    hospital_ids = [str(row[0]) for row in hospital_data]
+    hospital_counts = [row[1] for row in hospital_data]
+
+    conn.close()
+
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Admin Analytics</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body { font-family: Arial; padding:30px; background:#f4f6f9; }
+            .card {
+                background:white;
+                padding:20px;
+                margin-bottom:20px;
+                border-radius:10px;
+                box-shadow:0 2px 5px rgba(0,0,0,0.1);
+            }
+        </style>
+    </head>
+    <body>
+
+    <h2>Admin Analytics Dashboard</h2>
+
+    <div class="card">
+        <h3>Total Appointments: {{total}}</h3>
+        <h3>Today's Appointments: {{today}}</h3>
+    </div>
+
+    <div class="card">
+        <h3>Doctor Wise</h3>
+        <canvas id="doctorChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>Monthly</h3>
+        <canvas id="monthlyChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>Hospital Wise</h3>
+        <canvas id="hospitalChart"></canvas>
+    </div>
+
+    <script>
+    const doctors = {{doctors|tojson}};
+    const counts = {{counts|tojson}};
+    const months = {{months|tojson}};
+    const monthlyCounts = {{monthly_counts|tojson}};
+    const hospitals = {{hospital_ids|tojson}};
+    const hospitalCounts = {{hospital_counts|tojson}};
+
+    new Chart(document.getElementById('doctorChart'), {
+        type: 'bar',
+        data: {
+            labels: doctors,
+            datasets: [{
+                label: 'Appointments',
+                data: counts,
+                backgroundColor: 'rgba(54,162,235,0.7)'
+            }]
+        }
+    });
+
+    new Chart(document.getElementById('monthlyChart'), {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Monthly',
+                data: monthlyCounts,
+                borderColor: 'green',
+                fill:false
+            }]
+        }
+    });
+
+    new Chart(document.getElementById('hospitalChart'), {
+        type: 'pie',
+        data: {
+            labels: hospitals,
+            datasets: [{
+                data: hospitalCounts,
+                backgroundColor: ['red','blue','green','orange','purple']
+            }]
+        }
+    });
+    </script>
+
+    </body>
+    </html>
+    """, total=total,
+         today=today,
+         doctors=doctors,
+         counts=counts,
+         months=months,
+         monthly_counts=monthly_counts,
+         hospital_ids=hospital_ids,
+         hospital_counts=hospital_counts)
 
 
 # ------------------ DB INIT ------------------
@@ -538,4 +682,4 @@ def generate_pdf(appointment_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()

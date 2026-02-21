@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial; padding: 30px; background:#f4f6f9; }
+        h2 { color:#333; }
+        .card {
+            background:white;
+            padding:20px;
+            margin-bottom:20px;
+            border-radius:10px;
+            box-shadow:0 2px 5px rgba(0,0,0,0.1);
+        }
+        canvas { margin-top:20px; }
+    </style>
+</head>
+<body>
+
+<h2>Admin Analytics Dashboard</h2>
+
+<div class="card">
+    <h3>Total Appointments: {{ total }}</h3>
+    <h3>Today's Appointments: {{ today }}</h3>
+</div>
+
+<div class="card">
+    <h3>Doctor Wise Appointments</h3>
+    <canvas id="doctorChart"></canvas>
+</div>
+
+<div class="card">
+    <h3>Monthly Appointments</h3>
+    <canvas id="monthlyChart"></canvas>
+</div>
+
+<div class="card">
+    <h3>Hospital Wise Distribution</h3>
+    <canvas id="hospitalChart"></canvas>
+</div>
+
+<script>
+
+const doctors = JSON.parse('{{ doctors|tojson|safe }}');
+const counts = JSON.parse('{{ counts|tojson|safe }}');
+const months = JSON.parse('{{ months|tojson|safe }}');
+const monthlyCounts = JSON.parse('{{ monthly_counts|tojson|safe }}');
+const hospitals = JSON.parse('{{ hospital_ids|tojson|safe }}');
+const hospitalCounts = JSON.parse('{{ hospital_counts|tojson|safe }}');
+// 🎨 Doctor Bar Chart (Animated)
+new Chart(document.getElementById('doctorChart'), {
+    type: 'bar',
+    data: {
+        labels: doctors,
+        datasets: [{
+            label: 'Appointments',
+            data: counts,
+            backgroundColor: 'rgba(54,162,235,0.7)'
+        }]
+    },
+    options: {
+        animation: { duration: 1500 }
+    }
+});
+
+// 📅 Monthly Line Chart (Animated)
+new Chart(document.getElementById('monthlyChart'), {
+    type: 'line',
+    data: {
+        labels: months,
+        datasets: [{
+            label: 'Monthly Appointments',
+            data: monthlyCounts,
+            borderColor: 'green',
+            fill: false
+        }]
+    },
+    options: {
+        animation: { duration: 1500 }
+    }
+});
+
+// 🏥 Hospital Pie Chart
+new Chart(document.getElementById('hospitalChart'), {
+    type: 'pie',
+    data: {
+        labels: hospitals,
+        datasets: [{
+            data: hospitalCounts,
+            backgroundColor: ['red','blue','green','orange','purple']
+        }]
+    },
+    options: {
+        animation: { duration: 1500 }
+    }
+});
+
+</script>
+
+</body>
+</html>
